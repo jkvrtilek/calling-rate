@@ -5,15 +5,16 @@
 # Julia Vrtilek and Gerry Carter
 
 # load packages
-# install.packages("cmdstanr", repos = c('https://stan-dev.r-universe.dev', getOption("repos")))
 
 library(devtools)
+# install.packages("cmdstanr", repos = c('https://stan-dev.r-universe.dev', getOption("repos")))
 # install_github('ctross/STRAND@phosphorescent_desert_buttons')
 library(STRAND)
 
 # for data wranging
 library(tidyverse)
 library(igraph)
+library(broom)
 
 # for permutation tests
 library(vegan)
@@ -24,15 +25,9 @@ library(brms)
 library(performance)
 library(tidybayes)
 
-library(broom)
-
-# for MCMC 
-nchains <- 6
-warmup <- 1500
-chain_length <- 3000
-
 setwd("/Users/jkvrtilek/Desktop/OSU/PhD/GitHub/calling-rate")
 # setwd("~/Dropbox (Personal)/Dropbox/_working/_ACTIVE/__students/Julia Vrtilek/2025/bat pairs experiment")
+
 
 # load and wrangle vocal data ----
 batcalls <- readRDS("vocal_data_2024-pairs.RDS") %>% 
@@ -54,6 +49,7 @@ mcalls <-
 # get bats used in caller-receiver study 
 bats.used <- rownames(mcalls)
 bats.used
+
 
 # load and wrangle social data ----
 
@@ -102,7 +98,14 @@ km <-
   as.matrix()
 # note that all these kinship values are negative
 
-  
+
+# for MCMC 
+nchains <- 6
+warmup <- 1500
+chain_length <- 3000
+
+
+
 # BRMS: fit GLMMs that assume actor and receiver have independent effects in calling -----------
 
 matrix_to_df <- function(m){
@@ -267,45 +270,17 @@ t3 <- summary(fit3)$fixed %>% rownames_to_column("estimate") %>% mutate(model= "
 # save results
 rbind(t1,t2,t3) %>% 
   write.csv("results/BRMS_model_results.csv")
-      
+
+
 
 # STRAND: fit social relations model ---------
 # correlated effects of actor and receiver
-# make the STRAND data structure ----
-
-# individual variable - age
-chars <- read.csv('campus_bat_chars.csv', stringsAsFactors = F)
-chars$Bat.name <- tolower(chars$Bat.name)
-
-age <- 
-  chars %>% 
-  filter(Bat.name %in% bats.used) %>% 
-  select(Age) %>% 
-  mutate(Age= standardize(Age))
-
-rownames(age) <- bats.used
-
-# scale and store in list
-dyad = list(Kinship = scale(km),
-            Feeding = scale(mf),
-            Grooming = scale(mg))
-
-### We need to figure out whether to scale the matrix or the vector
-
-# combine into df
-dat = make_strand_data(
-  outcome = list(calls=mcalls),
-  individual_covariates = age,
-  dyadic_covariates = dyad,
-  outcome_mode = "poisson",
-  link_mode = "log",
-  check_standardization = F) 
 
 ### create function to save model diagnostics
 get_diagnostics <- function(model = model.here, 
                             label= "label here"){
   
-    model$fit$summary() %>% 
+  model$fit$summary() %>% 
     select(rhat, ess_bulk, ess_tail) %>% 
     summarize(min.rhat= min(rhat, na.rm=T), 
               max.rhat= max(rhat, na.rm=T),
@@ -316,7 +291,6 @@ get_diagnostics <- function(model = model.here,
     mutate(model = label) %>% 
     relocate(model)
 }
-
 
 ### function to plot posteriors from STRAND
 # note: block parameters 1 = intercept
@@ -390,6 +364,35 @@ plot_posteriors <- function(results= results,
   
 }
 
+# make the STRAND data structure ----
+chars <- read.csv('campus_bat_chars.csv', stringsAsFactors = F)
+chars$Bat.name <- tolower(chars$Bat.name)
+
+age <- 
+  chars %>% 
+  filter(Bat.name %in% bats.used) %>% 
+  select(Age) %>% 
+  mutate(Age= standardize(Age))
+
+rownames(age) <- bats.used
+
+# scale and store in list
+dyad = list(Kinship = scale(km),
+            Feeding = scale(mf),
+            Grooming = scale(mg))
+
+### We need to figure out whether to scale the matrix or the vector
+
+# combine into df
+dat = make_strand_data(
+  outcome = list(calls=mcalls),
+  individual_covariates = age,
+  dyadic_covariates = dyad,
+  outcome_mode = "poisson",
+  link_mode = "log",
+  check_standardization = F) 
+
+
 # model effect of allogrooming given -----
 sfit1 <- 
   fit_social_relations_model(
@@ -442,6 +445,7 @@ ggsave(
 #  df$HI = df$HI/df$Diff
 
 # there is no clear effect of allogrooming on calling rate after controlling for reciprocity in calling
+
 
 # model effect of feeding given -----
 sfit2 <- 
@@ -521,14 +525,66 @@ strand3 <-
                                    only_slopes=T)) 
 (plot3c <- plot_posteriors(res3, "genetic relatedness", "relatedness"))
 
+# save plot
+ggsave(
+  "results/kinship.pdf",
+  plot = plot3c,
+  scale = 1,
+  width = 5.5,
+  height = 6.5,
+  units = c("in", "cm", "mm", "px"),
+  dpi = 300)
 
-# Now lets measure effects for allogrooming and allofeeding RECEIVED 
+# plot dyadic effect coeff for allogrooming, allofeeding, kinship ----
+# get samples for dyadic effect coeff
+tf <- 
+  res2$samples$srm_model_samples$dyadic_coeffs %>% 
+  as_tibble() %>% 
+  rename(value= V1) %>% 
+  mutate(label= "Allofeeding")
+
+tg <- 
+  res1$samples$srm_model_samples$dyadic_coeffs %>% 
+  as_tibble() %>% 
+  rename(value= V1) %>% 
+  mutate(label= "Allogrooming")
+
+tk <- 
+  res3$samples$srm_model_samples$dyadic_coeffs %>% 
+  as_tibble() %>% 
+  rename(value= V1) %>% 
+  mutate(label= "Kinship")
+
+(dyad_coeff_plot <- 
+    rbind(tf,tg,tk) %>% 
+    mutate(label= fct_rev(label)) %>% 
+    ggplot(aes(y = label, x = value, fill=label)) +
+    stat_halfeye(.width = c(0.95), linewidth= 5, size=5)+
+    geom_vline(xintercept = 0)+
+    ylab("")+
+    xlab("model coefficient")+
+    theme_bw()+
+    theme(legend.position= 'none', 
+          axis.text.y = element_text(size = 12, vjust = 0.5, hjust = 0.5),
+          axis.text.x = element_text(size = 12),
+          axis.title.x = element_text(size = 12)
+    ))
+
+# save plot
+ggsave(
+  "results/summary.pdf",
+  plot = dyad_coeff_plot,
+  scale = 1,
+  width = 5.5,
+  height = 6.5,
+  units = c("in", "cm", "mm", "px"),
+  dpi = 300)
+
+# wrangle data to measure effects for allogrooming and allofeeding RECEIVED 
 # scale and store in list
-
 # transpose the matrix to flip given and received
 dyad = list(Feeding.received = scale(t(mf)),
             Grooming.received = scale(t(mg)))
-
 
 # combine into df
 dat = make_strand_data(
@@ -574,7 +630,6 @@ strand4 <-
 (plot4c <- plot_posteriors(res4, "allogrooming received", "allogrooming received"))
 
 
-
 # model effect of feeding received -----
 sfit5 <- 
   fit_social_relations_model(
@@ -616,8 +671,13 @@ plot1c+ plot2c+ plot3c+ plot4c+plot5c
 ### save all STRAND results
 rbind(strand1, strand2, strand3, strand4, strand5) %>% 
   relocate(Model) %>% 
-  write.csv(file= "STRAND_model_results.csv", row.names= FALSE)
+  write.csv(file= "results/STRAND_model_results.csv", row.names= FALSE)
 
 ### save all STRAND diagnostics
 rbind(diagnostics1, diagnostics2, diagnostics3, diagnostics4, diagnostics5) %>% 
-  write.csv(file= "STRAND_model_diagnostics.csv", row.names= FALSE)
+  write.csv(file= "results/STRAND_model_diagnostics.csv", row.names= FALSE)
+
+### save workspace
+timestamp <- substr(gsub(x=gsub(":","",Sys.time()), pattern=" ", replacement="_"), start=1, stop=15)
+save.image(file= paste("model_fit_workspace_", timestamp, ".Rdata", sep=""))
+
