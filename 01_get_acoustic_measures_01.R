@@ -5,7 +5,7 @@
 library(tidyverse)
 
 # set working directory
-setwd("/Users/jkvrtilek/Desktop/OSU/PhD/GitHub/pairs")
+setwd("/Users/jkvrtilek/Desktop/OSU/PhD/GitHub/calling-rate")
 
 # combine fundamental frequency measures and spectro_analysis measures
 spec <- readRDS("spectro_analysis_2025-05-06.RDS") %>% 
@@ -39,7 +39,7 @@ d2 <- d %>%
   filter(!is.nan(meanslope))
 
 # remove sounds that were manually designated not bat calls
-x <- list.files("/Users/jkvrtilek/Desktop/OSU/PhD/GitHub/pairs/not_batcalls/")
+x <- list.files("/Users/jkvrtilek/Desktop/OSU/PhD/GitHub/calling-rate/not_batcalls/")
 
 not.batcalls <- as.data.frame(x) %>% 
   mutate(x2 = substr(x,1,nchar(x)-5)) %>% 
@@ -49,5 +49,9 @@ not.batcalls <- as.data.frame(x) %>%
 
 d3 <- d2 %>% 
   filter(!sound.files %in% not.batcalls$filter)
+
+calls_per_bat <- d3 %>% 
+  group_by(caller) %>% 
+  summarize(n=n())
 
 saveRDS(d3, "vocal_data_2024-pairs.RDS")

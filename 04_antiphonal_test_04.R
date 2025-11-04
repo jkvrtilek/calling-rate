@@ -171,66 +171,103 @@ n.made.all %>%
 
 # simulation ----
 
+# get start time of each session
+session.time <- read_csv("trial_times.csv") %>% 
+  separate(date, into = c("month","day","year"), sep = "/") %>% 
+  # get date-time
+  mutate(y = as.integer(year) + 2000) %>% 
+  mutate(m = paste("0", month, sep = "")) %>% 
+  mutate(d = case_when(as.integer(day) < 10 ~ paste("0", day, sep = ""),
+                       .default = day)) %>% 
+  mutate(year.date = as.Date(paste(y, m, d, sep = "-"))) %>% 
+  mutate(time = as.POSIXct(paste(year.date, start.time))) %>% 
+  # get session ID
+  mutate(batA = tolower(batA),
+         batB = tolower(batB)) %>% 
+  mutate(date = paste(month, d, year, sep = "-")) %>% 
+  mutate(pair = paste(batA,batB,sep="-")) %>% 
+  mutate(session = paste(pair,date,sep="_")) %>% 
+  arrange(time) %>% 
+  mutate(trial = row_number()) %>% 
+  select(session, time, trial)
+
 d3 <- d %>%
   mutate(session = paste(pair,date,sep="_")) %>% 
-  mutate(use.start = end.time - length.wav) %>% 
-  mutate(call.start = use.start + start) %>% 
+  mutate(use.start = end.time - length.wav) %>% # time recording ends - length of wav file
+  mutate(call.start = use.start + start) %>% # time recording starts + time within recording call starts
   mutate(duration = end - start) %>% 
-  dplyr::select(sound.files:start,date:caller,call.start,duration,session)
+  dplyr::select(sound.files:start,date:caller,call.start,duration,session) %>% 
+  left_join(session.time, by = "session") %>% 
+  mutate(time.from.start = call.start - time) %>% # time since start of recording session %>% 
+  mutate(call.offset = time.from.start + duration/60) %>% # time.from.start is in mins, duration is in secs
+  separate(pair, into = c("left","right"), remove = F) %>% 
+  mutate(LR = case_when(caller == left ~ "left",
+                        caller == right ~ "right",
+                        .default = NA)) %>% 
+  select(session, trial, LR, caller, time.from.start, call.offset) %>% 
+  group_by(trial) %>% 
+  arrange(time.from.start, .by_group = T) %>% 
+  mutate(rand.trial = NA) %>% 
+  ungroup()
 
+left <- d3 %>%
+  filter(LR == "left")
+
+right <- d3 %>%
+  filter(LR == "right") %>% 
+  full_join(session.time, by = "session") %>% # add back trials with no calls from right bat
+  mutate(trial = trial.y) %>% 
+  select(session, trial, LR, caller, time.from.start, call.offset)
+
+# check that all trials are in right data - should be 84
+length(unique(right$trial))
+
+# prep for loop
 sims <- 5000
 
 results <- setNames(data.frame(matrix(ncol = 2, nrow = sims)),
-                    c("antiphon","overlap"))
-
-# get earliest and latest call per session
-d4 <- d3 %>% 
-  group_by(session) %>% 
-  mutate(earliest = min(call.start)) %>% 
-  mutate(latest = max(call.start)) %>% 
-  mutate(seclength = latest - earliest) %>% # number of seconds between onset of first and last calls in session
-  mutate(add.sec = 0) %>% 
-  ungroup()
-
-# make list of one df per session
-bysession <- d4 %>% 
-  group_split(session)
+                    c("antiphon","same.bat"))
 
 for (j in 1:sims) {
   
-  for (l in 1:length(bysession)) {
-    
-    # selects random number of seconds past the onset of the first call in each session
-    # for however many calls were in that session
-    bysession[[l]]$add.sec <- runif(nrow(bysession[[l]]), min = 0, max = bysession[[l]]$seclength[1])
-    
-  }
-    
-    # simulate data within blocks
-    sim.d <- bysession %>% 
-      rbindlist() %>% 
-      mutate(call.start.sim = earliest + add.sec) %>% 
-      mutate(call.end.sim = call.start.sim + duration) %>% 
-      mutate(caller_change = lag(caller) != caller) %>% 
-      filter(caller_change == F) %>%
-      arrange(call.start.sim) %>%
-      mutate(overlap = lag(call.end.sim) > call.start.sim)
+  set.seed(123+j)
   
-  sim.antiph <- sim.d %>% 
-    arrange(call.start.sim) %>% 
-    group_by(session) %>% 
-    mutate(lag.time = call.start.sim - lag(call.end.sim)) %>% 
-    mutate(lagsec = as.numeric(lag.time)) %>% 
+  # choose random trial number for each actual trial
+  r.trial <- right %>% 
+    select(trial) %>% 
+    distinct() %>% 
+    mutate(rand.trial = sample(1:84, 84, replace = F))
+  
+  r.sim <- right %>% 
+    left_join(r.trial, by = "trial")
+  
+  # match real trial number to random simulated trial number
+  left$rand.trial <- 
+    r.trial$rand.trial[match(left$trial,r.trial$rand.trial)]
+  
+  sim <- rbind(r.sim,left)
+  
+  sim.antiph <- sim %>% 
+    group_by(rand.trial) %>% 
+    arrange(time.from.start, .by_group = T) %>% 
     mutate(caller_change = lag(caller) != caller) %>% 
     filter(caller_change == T) %>% 
+    mutate(lag.time = time.from.start - lag(call.offset)) %>% 
+    mutate(lagsec = as.numeric(lag.time)) %>% 
     filter(lagsec < 0.5) %>% 
     filter(lagsec > 0.0018) # average length of call - overlapping calls don't count
   
   results$antiphon[j] <- nrow(sim.antiph)
   
-  results$overlap[j] <- sim.d %>% 
-    filter(overlap == T) %>% 
-    nrow()
+  same.bat <- sim %>% 
+    select(rand.trial,LR,caller) %>% 
+    distinct() %>% 
+    pivot_wider(names_from = LR, values_from = caller) %>% 
+    mutate(same = case_when(left == right ~ T,
+                            left != right ~ F,
+                            .default = NA))
+  
+  results$same.bat[j] <- sum(same.bat$same, na.rm=T)
   
   print(j)
 }
