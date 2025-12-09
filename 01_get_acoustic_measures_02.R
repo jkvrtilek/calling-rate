@@ -8,7 +8,7 @@ library(tidyverse)
 setwd("/Users/jkvrtilek/Desktop/OSU/PhD/GitHub/calling-rate")
 
 # combine fundamental frequency measures and spectro_analysis measures
-spec <- readRDS("spectro_analysis_2025-05-06.RDS") %>% 
+spec <- readRDS("spectro_analysis_2025-11-16.RDS") %>% 
   mutate(ID = paste(sound.files, caller, sep = "_"))
 
 ff <- readRDS("fundfreq_measures_2025-05-08.RDS") %>% 
@@ -54,4 +54,4 @@ calls_per_bat <- d3 %>%
   group_by(caller) %>% 
   summarize(n=n())
 
-saveRDS(d3, "vocal_data_2024-pairs.RDS")
+saveRDS(d3, "vocal_data_2024-pairs_2025-12-08.RDS")

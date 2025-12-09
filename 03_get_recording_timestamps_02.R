@@ -1,12 +1,12 @@
 # Get timestamps for all WAV files from 2024 pairs that contain at least one usable call
-# ONLY WORKS on computer that wrote original files! Acer laptop B405 running Windows.
+# ONLY WORKS on computer that wrote original files! Acer laptop B405 running Windows ----
 
 library(tidyverse)
 library(lubridate)
 library(clock)
 
 # get list of post-filter usable calls
-usable_calls <- readRDS("C:/Users/jkvrt/Downloads/vocal_data_2024-pairs_transformed.RDS") %>%
+usable_calls <- readRDS("C:/Users/jkvrt/Downloads/vocal_data_2024-pairs_2025-12-08.RDS") %>%
   select(sound.files, caller) %>%
   mutate(ID = paste(sound.files, caller, sep = "_"))
 
@@ -25,4 +25,4 @@ d <- sels %>%
 
 options(digits.secs = 6)
 
-saveRDS(d, "C:/Users/jkvrt/Downloads/2024_recording_timestamps.RDS")
+saveRDS(d, "C:/Users/jkvrt/Downloads/2024_recording_timestamps_2025-12-08.RDS")

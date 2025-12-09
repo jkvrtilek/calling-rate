@@ -28,9 +28,8 @@ library(tidybayes)
 setwd("/Users/jkvrtilek/Desktop/OSU/PhD/GitHub/calling-rate")
 # setwd("~/Dropbox (Personal)/Dropbox/_working/_ACTIVE/__students/Julia Vrtilek/2025/bat pairs experiment")
 
-
 # load and wrangle vocal data ----
-batcalls <- readRDS("vocal_data_2024-pairs.RDS") %>% 
+batcalls <- readRDS("vocal_data_2024-pairs_2025-12-08.RDS") %>% 
   group_by(caller, receiver) %>% 
   summarize(n.calls = n()) %>% 
   ungroup() %>% 
@@ -272,7 +271,6 @@ rbind(t1,t2,t3) %>%
   write.csv("results/BRMS_model_results.csv")
 
 
-
 # STRAND: fit social relations model ---------
 # correlated effects of actor and receiver
 
@@ -407,7 +405,7 @@ sfit1 <-
       iter_sampling = warmup))
 
 # summarize results
-res1 <-  summarize_strand_results(sfit1)
+res1 <- summarize_strand_results(sfit1)
 res1$summary
 
 # save diagnostics
@@ -572,7 +570,7 @@ tk <-
 
 # save plot
 ggsave(
-  "results/summary.pdf",
+  "results/STRAND_summary.pdf",
   plot = dyad_coeff_plot,
   scale = 1,
   width = 5.5,
@@ -596,7 +594,7 @@ dat = make_strand_data(
   check_standardization = T) 
 
 
-# model: effect of allogrooming received -----
+# model effect of allogrooming received -----
 sfit4 <- 
   fit_social_relations_model(
     data=dat,

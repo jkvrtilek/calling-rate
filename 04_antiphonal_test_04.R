@@ -13,7 +13,7 @@ library(data.table)
 setwd("/Users/jkvrtilek/Desktop/OSU/PhD/GitHub/calling-rate")
 
 # read list of usable calls with creation and modification timestamps 
-d <- readRDS("2024_recording_timestamps.RDS") %>% 
+d <- readRDS("2024_recording_timestamps_2025-12-08.RDS") %>% 
   mutate(filepath = paste("/Users/jkvrtilek/Desktop/OSU/PhD/Ch3/2024_pair_recordings",
                           date, pair, caller, sound.files, sep = "/")) %>% 
   mutate(length.wav = NA)
