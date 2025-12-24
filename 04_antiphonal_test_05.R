@@ -18,6 +18,7 @@ d <- readRDS("2024_recording_timestamps_2025-12-08.RDS") %>%
                           date, pair, caller, sound.files, sep = "/")) %>% 
   mutate(length.wav = NA)
 
+
 # get length of WAV files
 for(i in 1:nrow(d)) {
   x <- read_sound_file(d$filepath[i])

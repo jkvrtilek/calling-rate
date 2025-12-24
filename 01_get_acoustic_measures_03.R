@@ -3,6 +3,7 @@
 
 # load packages
 library(tidyverse)
+library(viridis)
 
 # set working directory
 setwd("/Users/jkvrtilek/Desktop/OSU/PhD/GitHub/calling-rate")
@@ -48,10 +49,43 @@ not.batcalls <- as.data.frame(x) %>%
   mutate(filter = paste(date, wav, selec, sep = "_"))
 
 d3 <- d2 %>% 
-  filter(!sound.files %in% not.batcalls$filter)
-
-calls_per_bat <- d3 %>% 
-  group_by(caller) %>% 
-  summarize(n=n())
+  filter(!sound.files %in% not.batcalls$filter) %>% 
+  mutate(undir.pair = if_else(caller < receiver,
+                              paste(caller, receiver, sep = "-"),
+                              paste(receiver, caller, sep = "-")))
 
 saveRDS(d3, "vocal_data_2024-pairs_2025-12-08.RDS")
+
+# get table of session, batA calls, batB calls ----
+d4 <- d3 %>% 
+  group_by(date, undir.pair, caller) %>% 
+  summarize(numcalls = n()) %>% 
+  mutate(batAB = case_when(caller == substr(undir.pair,1,5) ~ "batA",
+                           caller == substr(undir.pair,7,11) ~ "batB")) %>% 
+  select(date, undir.pair, batAB, numcalls) %>% 
+  pivot_wider(names_from = batAB, values_from = numcalls) %>% 
+  replace(is.na(.), 0)
+
+write.csv(d4, "calls_per_session.csv", row.names = F)
+
+# make heatmap of calls per directed dyad
+temp1 <- d3 %>% 
+  group_by(caller, receiver) %>% 
+  summarize(numcalls = n()) %>% 
+  mutate(pair = paste(caller, receiver))
+
+temp2 <- expand_grid(caller = sort(unique(d3$receiver)),
+                    receiver = sort(unique(d3$receiver))) %>% 
+  mutate(pair = paste(caller, receiver))
+
+hm <- left_join(temp2, temp1, by = "pair") %>% 
+  mutate(caller = caller.x) %>% 
+  mutate(receiver = receiver.x) %>% 
+  select(caller, receiver, numcalls) %>% 
+  mutate(n.calls = case_when(!is.na(numcalls)~numcalls,
+                             is.na(numcalls) & caller != receiver~0))
+
+ggplot(hm, aes(caller, receiver, fill = n.calls)) +
+  geom_tile() +
+  scale_fill_viridis(option="C", limits = c(1,800), na.value = "white") +
+  theme_bw()

@@ -25,6 +25,9 @@ library(brms)
 library(performance)
 library(tidybayes)
 
+# for plotting
+library(patchwork)
+
 setwd("/Users/jkvrtilek/Desktop/OSU/PhD/GitHub/calling-rate")
 # setwd("~/Dropbox (Personal)/Dropbox/_working/_ACTIVE/__students/Julia Vrtilek/2025/bat pairs experiment")
 
@@ -217,19 +220,19 @@ pp_check(fit2, ndraws=100)+xlim(0, 1000)
 pp_check(fit3, ndraws=100)+xlim(0, 1000)
 
 # get posteriors
-t1 <- 
+b1 <- 
   fit1 %>% 
   spread_draws(b_scalegroom) %>% 
   mutate(model = "Allogrooming") %>% 
   pivot_longer(b_scalegroom, names_to = 'term', values_to= 'coeff') 
 
-t2 <- 
+b2 <- 
   fit2 %>% 
   spread_draws(b_scalefeed) %>% 
   mutate(model = "Allofeeding") %>% 
   pivot_longer(b_scalefeed, names_to = 'term', values_to= 'coeff') 
 
-t3 <- 
+b3 <- 
   fit3 %>% 
   spread_draws(b_scalekinship) %>% 
   mutate(model = "Kinship") %>% 
@@ -237,7 +240,7 @@ t3 <-
 
 # plot models
 (models.plot <- 
-    rbind(t1, t2, t3) %>% 
+    rbind(b1, b2, b3) %>% 
     mutate(model= fct_rev(model)) %>%  
     ggplot(aes(y = model, x = coeff, fill=model)) +
     stat_halfeye(.width = c(0.95), linewidth= 5, size=5)+
@@ -245,6 +248,7 @@ t3 <-
     ylab("")+
     xlab("estimated effect on calling rate (coefficient)")+
     theme_bw()+
+    coord_cartesian(xlim = c(-2,2))+
     theme(legend.position= 'none', 
           axis.text.y = element_text(size = 12, vjust = 0.5, hjust = 0.5),
           axis.text.x = element_text(size = 12),
@@ -312,14 +316,12 @@ plot_posteriors <- function(results= results,
     rename(value= V1) %>% 
     mutate(label= "dyadic_effect_sd") 
   
-  
   # get samples for dyadic effect coeff
   t3 <- 
     results$samples$srm_model_samples$dyadic_coeffs %>% 
     as_tibble() %>% 
     rename(value= V1) %>% 
     mutate(label= "dyadic_effect_coeff") 
-  
   
   # get samples for focal-target effects rho (generalized reciprocity)
   t4 <- 
@@ -560,8 +562,9 @@ tk <-
     stat_halfeye(.width = c(0.95), linewidth= 5, size=5)+
     geom_vline(xintercept = 0)+
     ylab("")+
-    xlab("model coefficient")+
+    xlab("estimated effect on calling rate (coefficient)")+
     theme_bw()+
+    coord_cartesian(xlim = c(-2,2))+
     theme(legend.position= 'none', 
           axis.text.y = element_text(size = 12, vjust = 0.5, hjust = 0.5),
           axis.text.x = element_text(size = 12),
@@ -577,6 +580,21 @@ ggsave(
   height = 6.5,
   units = c("in", "cm", "mm", "px"),
   dpi = 300)
+
+# make paper figure
+(fig1 <- models.plot + dyad_coeff_plot +
+  plot_layout(axis_titles = "collect", axes = "collect_y"))
+
+# save plot
+ggsave(
+  "results/fig1.pdf",
+  plot = fig1,
+  scale = 1,
+  width = 7.5,
+  height = 6.5,
+  units = c("in", "cm", "mm", "px"),
+  dpi = 300)
+
 
 # wrangle data to measure effects for allogrooming and allofeeding RECEIVED 
 # scale and store in list
@@ -682,7 +700,6 @@ ggsave(
   dpi = 300)
 
 # plot all
-library(patchwork)
 plot1c+ plot2c+ plot3c+ plot4c+plot5c
 
 ### save all STRAND results
