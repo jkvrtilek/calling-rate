@@ -8,7 +8,7 @@ library(viridis)
 # set working directory
 setwd("/Users/jkvrtilek/Desktop/OSU/PhD/GitHub/calling-rate")
 
-# combine fundamental frequency measures and spectro_analysis measures
+# combine spectro_analysis measures and fundamental frequency measures ----
 spec <- readRDS("spectro_analysis_2025-11-16.RDS") %>% 
   mutate(ID = paste(sound.files, caller, sep = "_"))
 
@@ -20,14 +20,14 @@ d <- inner_join(spec, ff, by = "ID") %>%
   mutate(date = substring(date, 1, 10)) %>% 
   select(!ID)
 
-# convert seconds to milliseconds
+# convert seconds to milliseconds ----
 d$duration <- d$duration * 1000
 d$time.median <- d$time.median * 1000
 d$time.Q25 <- d$time.Q25 * 1000
 d$time.Q75 <- d$time.Q75 * 1000
 d$time.IQR <- d$time.IQR * 1000
 
-# filter duration, peak frequency, and time variables to remove sounds that are not contact calls
+# filter duration, peak frequency, and time variables to remove sounds that are not contact calls ---
 d2 <- d %>% 
   filter(duration > 3) %>% 
   filter(duration < 50) %>% 
@@ -39,7 +39,7 @@ d2 <- d %>%
   filter(!is.na(meanslope)) %>% 
   filter(!is.nan(meanslope))
 
-# remove sounds that were manually designated not bat calls
+# remove sounds that were manually designated not bat calls ----
 x <- list.files("/Users/jkvrtilek/Desktop/OSU/PhD/GitHub/calling-rate/not_batcalls/")
 
 not.batcalls <- as.data.frame(x) %>% 
@@ -54,7 +54,7 @@ d3 <- d2 %>%
                               paste(caller, receiver, sep = "-"),
                               paste(receiver, caller, sep = "-")))
 
-saveRDS(d3, "vocal_data_2024-pairs_2025-12-08.RDS")
+saveRDS(d3, paste("vocal_data_2024-pairs_", Sys.Date(), ".RDS", sep = ""))
 
 # get table of session, batA calls, batB calls ----
 d4 <- d3 %>% 
@@ -62,13 +62,25 @@ d4 <- d3 %>%
   summarize(numcalls = n()) %>% 
   mutate(batAB = case_when(caller == substr(undir.pair,1,5) ~ "batA",
                            caller == substr(undir.pair,7,11) ~ "batB")) %>% 
-  select(date, undir.pair, batAB, numcalls) %>% 
-  pivot_wider(names_from = batAB, values_from = numcalls) %>% 
-  replace(is.na(.), 0)
+  select(undir.pair, batAB, numcalls, date) %>% 
+  pivot_wider(names_from = batAB, values_from = numcalls)  %>% 
+  mutate(ID = paste(date, undir.pair, sep = "_")) %>% 
+  mutate(date = as.Date(date))
 
-write.csv(d4, "calls_per_session.csv", row.names = F)
+empty_sessions <- read_csv("trial_times.csv") %>% 
+  mutate(undir.pair = str_to_lower(if_else(batA < batB,
+                              paste(batA, batB, sep = "-"),
+                              paste(batB, batA, sep = "-")))) %>% 
+  mutate(ID = paste(date, undir.pair, sep = "_")) %>% 
+  select(ID, undir.pair, date)
 
-# make heatmap of calls per directed dyad
+d5 <- full_join(d4, empty_sessions) %>% 
+  replace(is.na(.), 0) %>% 
+  arrange(undir.pair)
+
+write.csv(d5, "calls_per_session.csv", row.names = F)
+
+# make heatmap of calls per directed dyad ----
 temp1 <- d3 %>% 
   group_by(caller, receiver) %>% 
   summarize(numcalls = n()) %>% 

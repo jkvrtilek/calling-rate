@@ -1,0 +1,7 @@
+"Type","Predictor","Estimate","Low_95","High_95","IRR","IRR_low","IRR_high"
+"Caller-Receiver Model","Allofeeding",0.55,0.07,1.04,1.73,1.08,2.83
+"Caller-Receiver Model","Allogrooming",0.88,0.23,1.59,2.4,1.26,4.9
+"Caller-Receiver Model","Kinship",0.4,-0.55,1.37,1.49,0.58,3.93
+"Social Relations Model","Allofeeding",0.52,-0.14,1.18,1.68,0.87,3.25
+"Social Relations Model","Allogrooming",0.72,0.01,1.44,2.06,1.01,4.2
+"Social Relations Model","Kinship",0.24,-0.89,1.36,1.26,0.41,3.9
