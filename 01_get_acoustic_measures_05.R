@@ -27,7 +27,7 @@ d$time.Q25 <- d$time.Q25 * 1000
 d$time.Q75 <- d$time.Q75 * 1000
 d$time.IQR <- d$time.IQR * 1000
 
-# filter duration, peak frequency, and time variables to remove sounds that are not contact calls ---
+# filter duration, peak frequency, and time variables to remove sounds that are not contact calls ----
 d2 <- d %>% 
   filter(duration > 3) %>% 
   filter(duration < 50) %>% 
@@ -53,6 +53,12 @@ d3 <- d2 %>%
   mutate(undir.pair = if_else(caller < receiver,
                               paste(caller, receiver, sep = "-"),
                               paste(receiver, caller, sep = "-")))
+
+callstats <- d3 %>% 
+  group_by(caller) %>% 
+  summarize(n = n()) %>% 
+  arrange(n)
+mean <- mean(callstats$n)
 
 saveRDS(d3, paste("vocal_data_2024-pairs_", Sys.Date(), ".RDS", sep = ""))
 

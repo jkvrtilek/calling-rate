@@ -14,7 +14,7 @@ setwd("/Users/jkvrtilek/Desktop/OSU/PhD/GitHub/calling-rate")
 
 # read list of usable calls with creation and modification timestamps 
 d <- readRDS("2024_recording_timestamps_2025-12-08.RDS") %>% 
-  mutate(filepath = paste("/Users/jkvrtilek/Desktop/OSU/PhD/Ch3/2024_pair_recordings",
+  mutate(filepath = paste("/Users/jkvrtilek/Desktop/OSU/PhD/Ch2-3/2024_pair_recordings",
                           date, pair, caller, sound.files, sep = "/")) %>% 
   mutate(length.wav = NA) %>% 
   rename(creation = start.time, modification = end.time)
@@ -48,7 +48,6 @@ d2 <- d %>%
   arrange(call.start) %>% 
   group_by(session) %>% 
   mutate(lag.time = call.start - lag(call.end)) %>% 
-  mutate(lagsec = as.numeric(lag.time)) %>% 
   mutate(caller_change = lag(caller) != caller) %>% 
   filter(caller_change == T) %>% 
   filter(lag.time < 5) %>% # to make plot readable - excludes 123 calls
@@ -193,7 +192,7 @@ n.made.all %>%
   theme_bw()
 
 
-# simulation ----
+# permutation test ----
 
 # get start time of each session
 session.time <- read_csv("trial_times.csv") %>% 
@@ -243,11 +242,11 @@ right <- d3 %>%
   filter(LR == "right")
   
 # prep for loop
-sims <- 5000
+perms <- 5000
 
-results <- setNames(data.frame(matrix(ncol = 1, nrow = sims)), "antiphon")
+results <- setNames(data.frame(matrix(ncol = 1, nrow = perms)), "antiphon")
 
-for (j in 1:sims) {
+for (j in 1:perms) {
   
   set.seed(123+j)
   
@@ -258,34 +257,34 @@ for (j in 1:sims) {
     mutate(rand.trial = sample(1:84, length(unique(right$trial)), replace = F))
   
   # assign random trial # to "right" bat calls
-  r.sim <- right %>% 
+  r.perm <- right %>% 
     left_join(r.trial, by = "trial")
   
   # keep real trial # for "left" bat calls
   left$rand.trial <- left$trial
   
   # combine such that real left-bat trials are paired with a random right-bat trial
-  sim <- rbind(r.sim,left)
+  perm <- rbind(r.perm,left)
   
   # get all trials where a bat was randomly paired with itself
-  same.bat <- sim %>% 
+  same.bat <- perm %>% 
     select(rand.trial,LR,caller) %>% 
     distinct() %>% 
     pivot_wider(names_from = LR, values_from = caller) %>% 
     filter(left == right)
   
-  sim.antiph <- sim %>% 
+  perm.antiph <- perm %>% 
     filter(!(rand.trial %in% same.bat$rand.trial)) %>% # remove paired-with-self
     group_by(rand.trial) %>% 
     arrange(time.from.start, .by_group = T) %>% 
     mutate(caller_change = lag(caller) != caller) %>% 
     filter(caller_change == T) %>% 
     mutate(lag.time = time.from.start - lag(call.offset)) %>% 
-    mutate(lagsec = as.numeric(lag.time)) %>% 
+    mutate(lagsec = as.numeric(lag.time)*60) %>% 
     filter(lagsec < 0.5) %>% 
     filter(lagsec > 0.0018) # average length of call - overlapping calls don't count
   
-  results$antiphon[j] <- nrow(sim.antiph)
+  results$antiphon[j] <- nrow(perm.antiph)
   
   print(j)
 }
@@ -295,3 +294,5 @@ range95 <- round(quantile(results$antiphon, probs= c(0.025, 0.975), na.rm=T),3)
 obs <- n.antiph/n.total
 exp.low <- range95[1]/n.total
 exp.high <- range95[2]/n.total
+
+p.value <- nrow(results %>% filter(antiphon >= 69))/perms
