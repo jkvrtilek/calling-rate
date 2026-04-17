@@ -53,7 +53,7 @@ d2 <- d %>%
   filter(lag.time < 5) %>% # to make plot readable - excludes 123 calls
   filter(lag.time > .0018) # length of time it would take call to travel between bats - excludes 3 calls
 
-p <- ggplot(d2, aes(x = lagsec)) + 
+p <- ggplot(d2, aes(x = lag.time)) + 
   geom_histogram(binwidth = 0.1, col = "white") +
   scale_x_continuous(breaks = seq(0, 5, by=1)) +
   geom_vline(xintercept = 0.5, color = "red") +
@@ -64,7 +64,7 @@ p
 
 # save plot
 ggsave(
-  "results/call_intervals.jpg",
+  "results/call_intervals.pdf",
   plot = p,
   scale = 1,
   width = 6.5,
@@ -159,25 +159,26 @@ for (m in 1:nrow(prob.give)) {
 
 # probabilities plot ----
 pp <- ggplot() +
-  geom_errorbarh(data = prob.give, aes(y=focal.bat, xmin=low, xmax=high, height = 0.3),
+  geom_errorbarh(data = prob.give, aes(y=focal.bat, xmin=low, xmax=high, height = 0.7),
                  size=1, color = "gray") +
-  geom_errorbarh(data = prob.get, aes(y=focal.bat, xmin=low, xmax=high, height = 0.3),
+  geom_errorbarh(data = prob.get, aes(y=focal.bat, xmin=low, xmax=high, height = 0.7),
                  size=1, color = "gray") +
   geom_point(data = prob.give, aes(x=prob, y=focal.bat, size=n.m)) +
   geom_point(data = prob.get, aes(x=prob, y=focal.bat, size=n.made)) +
   facet_grid(~panel) +
   ylab("focal bat") +
   xlab("probability") +
+  labs(size = "# calls") +
   theme_bw()
 pp
 
 # save plot
 ggsave(
-  "results/getgive_probability.jpg",
+  "results/getgive_probability.pdf",
   plot = pp,
   scale = 1,
-  width = 9,
-  height = 4,
+  width = 6.5,
+  height = 3,
   units = c("in", "cm", "mm", "px"),
   dpi = 300)
 

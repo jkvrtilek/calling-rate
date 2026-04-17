@@ -85,25 +85,3 @@ d5 <- full_join(d4, empty_sessions) %>%
   arrange(undir.pair)
 
 write.csv(d5, "calls_per_session.csv", row.names = F)
-
-# make heatmap of calls per directed dyad ----
-temp1 <- d3 %>% 
-  group_by(caller, receiver) %>% 
-  summarize(numcalls = n()) %>% 
-  mutate(pair = paste(caller, receiver))
-
-temp2 <- expand_grid(caller = sort(unique(d3$receiver)),
-                    receiver = sort(unique(d3$receiver))) %>% 
-  mutate(pair = paste(caller, receiver))
-
-hm <- left_join(temp2, temp1, by = "pair") %>% 
-  mutate(caller = caller.x) %>% 
-  mutate(receiver = receiver.x) %>% 
-  select(caller, receiver, numcalls) %>% 
-  mutate(n.calls = case_when(!is.na(numcalls)~numcalls,
-                             is.na(numcalls) & caller != receiver~0))
-
-ggplot(hm, aes(caller, receiver, fill = n.calls)) +
-  geom_tile() +
-  scale_fill_viridis(option="C", limits = c(1,800), na.value = "white") +
-  theme_bw()
